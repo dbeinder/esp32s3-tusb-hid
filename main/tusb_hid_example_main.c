@@ -11,6 +11,9 @@
 #include "tinyusb.h"
 #include "class/hid/hid_device.h"
 #include "driver/gpio.h"
+#include "esp_sleep.h"
+#include "esp_pm.h"
+#include "esp_private/esp_clk.h"
 
 #define APP_BUTTON (GPIO_NUM_0) // Use BOOT signal by default
 static const char *TAG = "example";
@@ -162,6 +165,20 @@ void app_main(void)
         .pull_down_en = false,
     };
     ESP_ERROR_CHECK(gpio_config(&boot_button_config));
+
+    esp_pm_config_t pm_config_40MHz = { .max_freq_mhz = 40, .min_freq_mhz = 40 };
+    esp_pm_config_t pm_config_80MHz = { .max_freq_mhz = 80, .min_freq_mhz = 80 };
+    ESP_ERROR_CHECK(esp_pm_configure(&pm_config_40MHz));
+    ESP_LOGI(TAG, "Core Clock: %lu MHz", esp_clk_cpu_freq()/1000000UL);
+    ESP_LOGI(TAG, "Entering Light Sleep...");
+
+    esp_sleep_enable_timer_wakeup(1000*1000);
+    esp_err_t res = esp_light_sleep_start();
+    ESP_LOGI(TAG, "Resumed (%d) %s", res, esp_err_to_name(res));
+
+    // Briefly switching to >40MHz gets the DWC2 peripheral going again
+    //ESP_ERROR_CHECK(esp_pm_configure(&pm_config_80MHz));
+    //ESP_ERROR_CHECK(esp_pm_configure(&pm_config_40MHz));
 
     ESP_LOGI(TAG, "USB initialization");
     const tinyusb_config_t tusb_cfg = {
